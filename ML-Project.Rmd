@@ -1,0 +1,119 @@
+---
+title: "Machine Learning Project"
+output: html_document
+---
+##Executive Summary##
+
+The Weight Lifting Exercise Dataset is used for this project.  Caret package is loaded and used to test different models for prediction.  Random Forest appraoch with K-fold cross validation proves to be quite accurate in predicting outcomes. 
+
+**Background**
+
+This project uses data collected from six participants aged between 20-28 year old using devices such as Jawbone UP, Nike FuelBand, and Fitbit wearing on the belt, forearm, arm and dumbell.  They were asked to perform barbell lifts correctly and incorrectly in 5 different methods: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). More information about data can be found at website: http://groupware.les.inf.puc-rio.br/har.  
+
+**Environment setup**
+
+Packages and libaries (caret, randomforest, rpart) are downloaded and installed.
+
+```{r, echo=FALSE}
+#install.packages("caret", repos = "http://cran.us.r-project.org")
+#.packages("randomForest", repos = "http://cran.us.r-project.org")
+#install.packages("rpart")
+#install.packages('e1071', dependencies=TRUE, repos = "http://cran.us.r-project.org")
+library(knitr)
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+
+```
+
+**Data importing and processing**
+
+Two datasets are downloaded and loaded into R, identifying "NA", "" and "#DIV/0!" as NA strings
+
+```{r}
+## set working directory
+setwd ("c:/temp/Machine Learning/")
+
+#Import datasets
+TrainData <- read.csv ("pml-training.csv", na.strings=c("NA","#DIV/0!", ""))
+dim(TrainData)
+TestData <- read.csv ("pml-testing.csv", na.strings=c("NA","#DIV/0!", ""))
+dim(TestData)
+```
+
+Processing: 
+
+The first seven variables are irrevalent in predicting "classe" so were removed from the datasets.  All columns with missing values are removed as well.
+
+
+```{r}
+cleantrain <-TrainData [,-c(1:7)]
+cleantrain<-cleantrain [,colSums(is.na(cleantrain)) ==0]
+cleantest <-TestData [,-c(1:7)]
+cleantest<-cleantest [,colSums(is.na(cleantest)) ==0]
+
+dim(cleantrain)
+dim(cleantest)
+```
+
+After processing variables are reduced from 160 to 53.  
+
+**Data partitioning**
+
+Since the Training dataset is relatively large (N=19622), it is further devided into two subsets for cross-validation: 75% of the trainingSet that can be used for training different models, 25% of the trainingset for testing model performance.  The partition uses random subsampling.  A plot shows after resammpling the variable "classe" has five levels and its frequency.  
+
+```{r}
+set.seed(1234)     
+ 
+trainIndex <- createDataPartition(y=cleantrain$classe, p=0.75, list=FALSE)
+trainingSet<- cleantrain[trainIndex,]
+testingSet<- cleantrain[-trainIndex,]
+
+plot(trainingSet$classe, col="blue", main="Levels of the variable classe within the subTraining dataset", xlab="classe levels", ylab="Frequency")
+```
+
+**Model Selection and Tesing**
+
+1. Decision Tree model:
+
+```{r}
+modelFitrpart <- rpart(classe ~., data=trainingSet, method = "class")
+predictionrpart <- predict(modelFitrpart, testingSet, type = "class")
+rpart.plot(modelFitrpart, main = "Classification Tree", extra = 102, under=TRUE, faclen=0)
+
+```
+```{r}
+confusionMatrix(predictionrpart, testingSet$classe)
+```
+
+This model has 73.94% accuracy.  
+
+2. Random Forest Model with 3-fold cross validation  
+
+```{r}
+tc <- trainControl(method = "cv", number = 3, verboseIter=FALSE , allowParallel=TRUE)
+rf <- train(classe ~ ., data = trainingSet, method = "rf", trControl= tc, prox = TRUE, allowParallel=TRUE)
+print(rf)
+PredRF <- predict(rf, testingSet)
+confusionMatrix(PredRF, testingSet$classe)
+
+```
+
+The accuracy of this model is 99.41%.  The expected out-of sample error is estimated at 0.0059.  Based on the better accuracy, this model is selected as the final model.
+
+**Final Prediction**
+Predict outcome levels on the original Testing data set using Random Forest algorithm with 3 folder cross validation
+
+```{r}
+finalanswer <-predict(rf, cleantest)
+finalanswer
+
+```
+**Conclusion**
+
+In this project the Weight Lifting Exercise Dataset is used.  After data cleaning by removing NAs, Blank Columns and not-related columns the variables number was successfully reduced from 160 to 53.  
+
+After model selection process Random Forest classification model is used and the accuracy rate is 0.9941 and  the out-of-sample error rate is 0.0059.
+
+Implementing the model to 20 test cases, the predicting got the 100% correctness rate.
